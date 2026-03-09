@@ -17,10 +17,11 @@
 | DB | **XTDB v2** | bi-temporal DB。Docker コンテナとして稼働 |
 | プロトコル | **pgwire** | PostgreSQL 互換ワイヤープロトコル |
 | クエリ | **SQL** | XTDB SQL（SQL:2011 temporal 拡張） |
-| API | **TypeScript** | REST API 層 |
+| API | **Hono** (TypeScript) | REST API。Vercel Serverless にデプロイ |
+| UI | **Next.js** | フロントエンド。Vercel にデプロイ |
 | スキーマ検証 | **Zod** | アプリ層でのバリデーション |
 | ストレージ | **ローカルディスク** | XTDB v2 のデフォルト。Apache Arrow 形式 |
-| デプロイ | **Docker** | ローカル開発 → クラウド VPS + Volume |
+| デプロイ | **Docker** → **Vercel + VPS** | ローカル: Docker / 本番: XTDB on VPS, API+UI on Vercel |
 
 ### テーブルモデル
 
@@ -705,8 +706,8 @@ VALUES
 │  track: resource別に定義（actual は必須）           │
 │                                                    │
 │  技術スタック:                                      │
-│    XTDB v2 (Docker) + TypeScript + pgwire          │
-│    SQL / Zod                                       │
+│    XTDB v2 (Docker/VPS) + Hono + Next.js           │
+│    SQL (pgwire) / Zod / Vercel                     │
 └──────────────────────────────────────────────────┘
 ```
 
