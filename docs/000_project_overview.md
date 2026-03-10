@@ -13,34 +13,41 @@
 
 ## 層の役割分担
 
+> **設計の根幹：Neon = 事実 / XTDB = 解釈**
+>
+> 事実（beanpost Posting、DWH レコード）は変更不可・bi-temporal 不要。
+> 解釈（event、observation）は事後修正・訂正が起きうるため XTDB の bi-temporal が必須。
+> DWH 全体を bi-temporal にすることはできないため、解釈層だけを XTDB に分離する。
+
 ```
 外部 API（真実の持ち主）
   Zaim / Fitbit / Toggl / Tanita / ...
         ↓  GAS パイプライン
 
-Neon — data_warehouse（本物の倉庫）
-  schema: data_warehouse   ← raw_*, stg_*, dim_*（DWH 内部実装）
+Neon ← 事実の格納（変更不可・bi-temporal 不要）
+  schema: data_warehouse    ← raw_*, stg_*, dim_*（DWH 内部実装）
   schema: data_presentation ← fct_*（外部公開インターフェース）
-  ← 外部 API の事実 + 手入力の源泉 + App が書き戻す派生値
+  schema: accounting        ← 会計帳簿 beanpost（金銭・権利・義務）
+  schema: inventory         ← 在庫帳簿 beanpost（物品・栄養）+ food_nutrition_ratio
 
 App 層
-  ← Neon を読み、resource_link ルールを適用して派生値を計算 → Neon に書き戻す
+  ← Neon（beanpost）に仕訳を記録する
+  ← inventory の food_nutrition_ratio を参照して栄養 Posting を自動生成する
   ← dc_catalog に record を登録（遅延）
   ← DCMP に event / observation を作成する
   ← DWH の分類情報（fct の attrs 相当カラム）を observation.attrs に転記する
 
 XTDB — dc_catalog（インフラカタログ）※ 別 DB
   ← data_source: DWH テーブルの論理名 → 物理 URI マッピング
-  ← record: DWH 行ごとの XTDB サロゲートキー発行（DWH の変更を吸収）
+  ← record: DWH・beanpost 行ごとの XTDB サロゲートキー発行（変更を吸収）
 
-XTDB — data_composition（意味付け層）
+XTDB — data_composition（解釈層）← bi-temporal
   ← 値を持たない。共起・分類のみ
-  ← DWH の ID を直接知らない（record_id 経由）
+  ← 事実の ID を直接知らない（record_id 経由）
   ← scenario: event へのタグ（横断的分析軸 + 期間を持つプロジェクト的文脈）
   ← event: 複数観測が「同一の現実の出来事」であることの宣言
   ← observation: event が record を resource として「観測した」という意味付け行為
   ← resource: 分類オントロジー（階層ツリー）
-  ← resource_link: 変換ルールの定義（実行はアプリ層）
 ```
 
 ---
@@ -448,6 +455,29 @@ App はこのテーブルを参照して、摂取 transaction を自動生成す
 - 会計 beanpost / 在庫 beanpost を Neon 上にデプロイ（スキーマ適用）
 - Zaim → 会計 beanpost への ETL（過去データの変換）
 - beanpost の導入完了まで Zaim を継続利用し、4月以降に切り替えを検討
+
+---
+
+### [2026-03] XTDB bi-temporal は必須 — 事実層と解釈層の分離
+
+**問い：** composition 層を XTDB で別管理する意義はあるか？Neon に統合すれば済むのでは？
+
+**検討：**
+
+- Neon（beanpost）のすべてのスキーマを bi-temporal にすることはできない
+- beanpost は PL/pgSQL 関数に依存しており XTDB 上では動作しない
+- しかし event / observation（解釈）は事後修正・訂正が本質的に必要
+
+**決定：**
+
+> 事実（Neon）は不変。解釈（XTDB）だけが bi-temporal であればよい。
+
+- **Neon** = 事実の格納。DWH、会計帳簿、在庫帳簿。修正されない。
+- **XTDB** = 解釈の格納。event と observation は事後的に意味を変えうる。
+  bi-temporal により「いつ解釈されたか」「いつ修正されたか」の履歴を保持。
+
+全システムの bi-temporal 化は不可能であるため、
+解釈層だけを XTDB に分離するのが合理的な設計である。
 
 ---
 
