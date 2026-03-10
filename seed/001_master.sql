@@ -1,65 +1,62 @@
 -- ===========================================
+-- data_composition DB seed
+-- 接続先: xtdb-dcmp (port 5432)
+-- ===========================================
+
+-- ===========================================
 -- unit_master
 -- ===========================================
 INSERT INTO unit_master (_id, name) VALUES
   ('u-pcs',  'pcs'),
   ('u-g',    'g'),
   ('u-kg',   'kg'),
-  ('u-kcal', 'kcal');
+  ('u-kcal', 'kcal'),
+  ('u-ml',   'ml'),
+  ('u-min',  'min'),
+  ('u-jpy',  'JPY');
 
 -- ===========================================
--- track_master
+-- resource: grocery（物品。在庫として蓄積）
 -- ===========================================
-INSERT INTO track_master (_id, name, granularity) VALUES
-  ('actual', 'actual', 'point');
+INSERT INTO resource (_id, parent_id, is_leaf, cd, name, unit_id, balance_type) VALUES
+  ('r-grocery',    null,         false, 'grocery',    'grocery',                       'u-pcs',  'stock'),
+  ('r-beverage',   'r-grocery',  false, 'beverage',   'beverage',                      'u-pcs',  'stock'),
+  ('r-monster-rr', 'r-beverage', true,  'monster-rr', 'Monster Energy Ruby Red',       'u-pcs',  'stock'),
+  ('r-monster-pp', 'r-beverage', true,  'monster-pp', 'Monster Energy Pipeline Punch', 'u-pcs',  'stock');
 
 -- ===========================================
--- owner
+-- resource: nutrition（栄養素。消費フロー）
 -- ===========================================
-INSERT INTO owner (_id, cd, name, is_leaf, parent_id) VALUES
-  ('o-me', 'me', 'me', true, NULL);
+INSERT INTO resource (_id, parent_id, is_leaf, cd, name, unit_id, balance_type) VALUES
+  ('r-nutrition', null,           false, 'nutrition', 'nutrition', 'u-kcal', 'flow'),
+  ('r-energy',    'r-nutrition',  true,  'energy',    'energy',    'u-kcal', 'flow'),
+  ('r-protein',   'r-nutrition',  true,  'protein',   'protein',   'u-g',    'flow'),
+  ('r-fat',       'r-nutrition',  true,  'fat',       'fat',       'u-g',    'flow'),
+  ('r-carb',      'r-nutrition',  true,  'carb',      'carb',      'u-g',    'flow'),
+  ('r-salt-eq',   'r-nutrition',  true,  'salt_eq',   'salt_eq',   'u-g',    'flow');
 
 -- ===========================================
--- resource: grocery
+-- resource: time（時間。消費フロー）
 -- ===========================================
-INSERT INTO resource (_id, cd, name, category, unit_id, is_leaf, parent_id) VALUES
-  ('r-grocery',    'grocery',    'grocery',                  'grocery', 'u-pcs', false, NULL),
-  ('r-beverage',   'beverage',   'beverage',                'grocery', 'u-pcs', false, 'r-grocery'),
-  ('r-monster-rr', 'monster-rr', 'Monster Energy Ruby Red', 'grocery', 'u-pcs', true,  'r-beverage'),
-  ('r-monster-pp', 'monster-pp', 'Monster Energy Pipeline Punch', 'grocery', 'u-pcs', true, 'r-beverage');
+INSERT INTO resource (_id, parent_id, is_leaf, cd, name, unit_id, balance_type) VALUES
+  ('r-time',      null,       false, 'time',      'time',      'u-min', 'flow'),
+  ('r-time-work', 'r-time',   false, 'time-work', 'time/work', 'u-min', 'flow'),
+  ('r-time-life', 'r-time',   false, 'time-life', 'time/life', 'u-min', 'flow');
 
 -- ===========================================
--- resource: nutrition
+-- resource: money（金銭。フロー）
 -- ===========================================
-INSERT INTO resource (_id, cd, name, category, unit_id, is_leaf, parent_id) VALUES
-  ('r-nutrition', 'nutrition', 'nutrition', 'nutrition', 'u-kcal', false, NULL),
-  ('r-energy',    'energy',    'energy',    'nutrition', 'u-kcal', true,  'r-nutrition'),
-  ('r-protein',   'protein',   'protein',   'nutrition', 'u-g',    true,  'r-nutrition'),
-  ('r-fat',       'fat',       'fat',       'nutrition', 'u-g',    true,  'r-nutrition'),
-  ('r-carb',      'carb',      'carb',      'nutrition', 'u-g',    true,  'r-nutrition'),
-  ('r-salt-eq',   'salt_eq',   'salt_eq',   'nutrition', 'u-g',    true,  'r-nutrition');
-
--- ===========================================
--- resource_track
--- ===========================================
-INSERT INTO resource_track (_id, resource_id, track_id) VALUES
-  ('rt-monster-rr-a', 'r-monster-rr', 'actual'),
-  ('rt-monster-pp-a', 'r-monster-pp', 'actual'),
-  ('rt-energy-a',     'r-energy',     'actual'),
-  ('rt-protein-a',    'r-protein',    'actual'),
-  ('rt-fat-a',        'r-fat',        'actual'),
-  ('rt-carb-a',       'r-carb',       'actual'),
-  ('rt-salt-eq-a',    'r-salt-eq',    'actual');
+INSERT INTO resource (_id, parent_id, is_leaf, cd, name, unit_id, balance_type) VALUES
+  ('r-money',         null,       false, 'money',         'money',          'u-jpy', 'flow'),
+  ('r-money-income',  'r-money',  true,  'money-income',  'money/income',   'u-jpy', 'flow'),
+  ('r-money-expense', 'r-money',  true,  'money-expense', 'money/expense',  'u-jpy', 'flow');
 
 -- ===========================================
 -- resource_link
---   ratio = target units per 1 source unit
---   e.g. 1 pcs of monster-rr → 0 kcal energy
---   units are on each resource's unit_id
+--   ratio = 1 source unit あたりの target unit 数
 -- ===========================================
 
--- Monster Energy Ruby Red (355ml)
--- nutrition label: per 100ml → ×3.55 for 355ml
+-- Monster Energy Ruby Red (355ml / 1 pcs)
 INSERT INTO resource_link (_id, source_id, target_id, ratio) VALUES
   ('rl-rr-energy',  'r-monster-rr', 'r-energy',  0),
   ('rl-rr-protein', 'r-monster-rr', 'r-protein', 0),
@@ -67,8 +64,7 @@ INSERT INTO resource_link (_id, source_id, target_id, ratio) VALUES
   ('rl-rr-carb',    'r-monster-rr', 'r-carb',    3.195),
   ('rl-rr-salt-eq', 'r-monster-rr', 'r-salt-eq', 0.8165);
 
--- Monster Energy Pipeline Punch (355ml)
--- nutrition label: per 100ml → ×3.55 for 355ml
+-- Monster Energy Pipeline Punch (355ml / 1 pcs)
 INSERT INTO resource_link (_id, source_id, target_id, ratio) VALUES
   ('rl-pp-energy',  'r-monster-pp', 'r-energy',  195.25),
   ('rl-pp-protein', 'r-monster-pp', 'r-protein', 0),

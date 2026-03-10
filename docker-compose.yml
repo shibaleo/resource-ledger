@@ -1,11 +1,20 @@
 services:
-  xtdb:
+  xtdb-catalog:
     image: ghcr.io/xtdb/xtdb:latest
     ports:
-      - "5432:5432"   # pgwire (PostgreSQL互換)
+      - "5433:5432"   # pgwire (dc_catalog)
+      - "8081:8080"   # health check / monitoring
+    volumes:
+      - xtdb-catalog-data:/var/lib/xtdb
+
+  xtdb-dcmp:
+    image: ghcr.io/xtdb/xtdb:latest
+    ports:
+      - "5432:5432"   # pgwire (data_composition)
       - "8080:8080"   # health check / monitoring
     volumes:
-      - xtdb-data:/var/lib/xtdb
+      - xtdb-dcmp-data:/var/lib/xtdb
 
 volumes:
-  xtdb-data:
+  xtdb-catalog-data:
+  xtdb-dcmp-data:
